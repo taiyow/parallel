@@ -82,15 +82,38 @@ module Parallel
   end
 
   class JobFactory
-    def initialize(source, mutex)
+    def initialize(source, mutex, max_rate)
       @lambda = (source.respond_to?(:call) && source) || queue_wrapper(source)
       @source = source.to_a unless @lambda # turn Range and other Enumerable-s into an Array
       @mutex = mutex
       @index = -1
       @stopped = false
+      @max_rate = max_rate
+      @current_call_mutex = Mutex.new
+    end
+
+    def current_calls
+      @current_call_mutex.synchronize do
+        sec = Time.now.to_i
+        if sec != @current_sec
+          @current_sec = sec
+          @current_calls = 0
+        end
+        @current_calls += 1
+      end
+    end
+
+    def throttle
+      return unless @max_rate
+      loop do
+        return if current_calls <= @max_rate
+        sleep 0.9
+      end
     end
 
     def next
+      throttle
+
       if producer?
         # - index and item stay in sync
         # - do not call lambda after it has returned Stop
@@ -236,7 +259,7 @@ module Parallel
         end
       end
 
-      job_factory = JobFactory.new(source, options[:mutex])
+      job_factory = JobFactory.new(source, options[:mutex], options[:max_rate])
       size = [job_factory.size, size].min
 
       options[:return_results] = (options[:preserve_results] != false || !!options[:finish])
