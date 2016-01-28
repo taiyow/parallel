@@ -469,8 +469,8 @@ module Parallel
       end
 
       pids = options[:distribute].map{ |node|
-        actual_command = command.gsub(/%%/){ options[:count] }
-        spawn 'ssh', '-q', node, "export DPARALLEL_MASTER='#{my_ip}|#{my_port}'; #{actual_command}"
+        spawn 'ssh', '-q', node,
+              "export DPARALLEL_MASTER='#{my_ip}|#{my_port}' DPARALLEL_MY_NODE='#{node}'; #{command}"
       }
 
       timeout_sec = options[:distribute_timeout] || 60
