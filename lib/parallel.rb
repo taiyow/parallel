@@ -94,9 +94,9 @@ module Parallel
 
     def current_calls
       @current_call_mutex.synchronize do
-        sec = Time.now.to_i
-        if sec != @current_sec
-          @current_sec = sec
+        secx10 = (Time.now.to_f * 10).to_i
+        if secx10 != @current_secx10
+          @current_secx10 = secx10
           @current_calls = 0
         end
         @current_calls += 1
@@ -106,8 +106,8 @@ module Parallel
     def throttle
       return unless @max_rate
       loop do
-        return if current_calls <= @max_rate
-        sleep 0.9
+        return if current_calls < @max_rate/10
+        sleep rand(0.1)
       end
     end
 
