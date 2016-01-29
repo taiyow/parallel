@@ -82,32 +82,43 @@ module Parallel
   end
 
   class JobFactory
-    def initialize(source, mutex, max_rate)
+    TICK_MS = 100  # for throttling
+    TICK_MULTIPLIER = (1000 / TICK_MS)
+
+    def initialize(source, mutex, max_rate=nil)
       @lambda = (source.respond_to?(:call) && source) || queue_wrapper(source)
       @source = source.to_a unless @lambda # turn Range and other Enumerable-s into an Array
       @mutex = mutex
       @index = -1
       @stopped = false
-      @max_rate = max_rate
-      @current_call_mutex = Mutex.new
+      @job_per_tick = (max_rate * (TICK_MS / 1000.0)).ceil if max_rate
+      @thorottle_mutex = Mutex.new
     end
 
-    def current_calls
-      @current_call_mutex.synchronize do
-        secx10 = (Time.now.to_f * 10).to_i
-        if secx10 != @current_secx10
-          @current_secx10 = secx10
+    def get_tick
+     (Time.now.to_f * TICK_MULTIPLIER).floor
+    end
+
+    def under_limit?
+      @thorottle_mutex.synchronize do
+        tick = get_tick
+        if tick != @current_tick
+          @current_tick = tick
           @current_calls = 0
         end
-        @current_calls += 1
+        if @current_calls < @job_per_tick
+          @current_calls += 1
+          return true
+        else
+          return false
+        end
       end
     end
 
     def throttle
-      return unless @max_rate
       loop do
-        return if current_calls < @max_rate/10
-        sleep rand(0.1)
+        return if @job_per_tick.nil? || @index >= size-1 || under_limit?
+        sleep rand(TICK_MS / 1000.0)
       end
     end
 
@@ -222,7 +233,6 @@ module Parallel
       options[:begin].call if options[:begin]
       count, _ = extract_count_from_options(options)
       result = Array.new(count).each_with_index.map do |_, i|
-        print "thread #{i}\n"
         Thread.new { yield(i) }
       end.map!(&:value)
       options[:end].call if options[:end]
