@@ -402,6 +402,7 @@ module Parallel
               end
             end
           ensure
+            sleep if options[:sleep_after]
             worker.close_pipes
             worker.wait # if it goes zombie, rather wait here to be able to debug
           end
@@ -431,6 +432,7 @@ module Parallel
           parent_read.close
 
           process_incoming_jobs(child_read, child_write, job_factory, options, &block)
+        rescue Interrupt
         ensure
           child_read.close
           child_write.close
