@@ -483,6 +483,7 @@ module Parallel
       pids = options[:distribute].map{ |node|
         spawn 'ssh', '-q', node,
               "export DPARALLEL_MASTER='#{my_ip}|#{my_port}' DPARALLEL_MY_NODE='#{node}'; #{command}"
+        sleep 0.1  # to avoid ssh-rush
       }
 
       timeout_sec = options[:distribute_timeout] || 60
