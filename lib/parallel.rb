@@ -402,9 +402,10 @@ module Parallel
               end
             end
           ensure
-            sleep if options[:sleep_after]
-            worker.close_pipes
-            worker.wait # if it goes zombie, rather wait here to be able to debug
+            unless options[:sleep_after]
+              worker.close_pipes
+              worker.wait # if it goes zombie, rather wait here to be able to debug
+            end
           end
         end
       end
